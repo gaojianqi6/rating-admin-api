@@ -1,55 +1,36 @@
 from fastapi import FastAPI, Request, HTTPException, status
-from fastapi.responses import JSONResponse
 import logging
 from app.api.v1.endpoints import auth, users, test
+from app.api.root import router as root_router
+from app.core.middleware import ResponseWrapperMiddleware
+from app.core.error_handlers import http_exception_handler, generic_exception_handler
 
 # Configure logging (this example uses the uvicorn logger)
 logger = logging.getLogger("uvicorn.error")
 logging.basicConfig(level=logging.INFO)
 
 # Initialize the FastAPI app
-app = FastAPI()
+app = FastAPI(
+    title="Rating Admin API",
+    description="This API handles authentication and user operations for Rating Admin",
+    version="1.0.0",
+    docs_url="/docs",   # Swagger UI available at /docs
+    redoc_url="/redoc"  # ReDoc available at /redoc
+)
 
-# Exception handler for HTTPException
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    logger.error(f"HTTP Exception: {exc.detail}")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "code": str(exc.status_code),
-            "data": {},
-            "message": exc.detail
-        }
-    )
 
-# Exception handler for all other exceptions
-@app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
-    logger.error("Unhandled exception occurred:", exc_info=True)
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "code": "500",
-            "data": {},
-            "message": exc.detail
-        }
-    )
+# Add the middleware to the app
+app.add_middleware(ResponseWrapperMiddleware)
 
-# Register API endpoints
+# Register global exception handlers:
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
+
+#  Include routers (each router have its own prefix and tags)
 app.include_router(auth.router)
 app.include_router(users.router)
-
 app.include_router(test.router)
-
-# Root endpoint
-@app.get("/")
-def read_root():
-    return {
-        "code": "200",
-        "data": {"ratingAdminAPIVersion": "0.0.1"},
-        "message": ""
-    }
+app.include_router(root_router)
 
 if __name__ == "__main__":
     import uvicorn

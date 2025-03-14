@@ -19,3 +19,6 @@ ADMIN_DATABASE_URL="postgresql+psycopg2://username:password@localhost/rating_adm
 ADMIN_JWT_SECRET=****
 
 ```
+
+### Doc
+FastAPI automatically includes interactive API documentation (Swagger UI) at /docs and ReDoc at /redoc. For example: `http://localhost:8000/docs` or `http://localhost:8000/redoc`.

@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 from app.core.security import hash_password, verify_password
 
-router = APIRouter()
+router = APIRouter(prefix="/test", tags=["test"])
 
-@router.get("/test/password")
+@router.get("/password")
 async def test_password():
     # Plain text password for demonstration purposes.
     plain_password = "123456"
@@ -20,10 +20,6 @@ async def test_password():
     # Return the hashed password and verification result.
     # You can store the 'hashed' value in your database for your user record.
     return {
-        "code": "200",
-        "data": {
-            "hashed_password": hashed,
-            "verification": valid
-        },
-        "message": ""
+        "hashed_password": hashed,
+        "verification": valid
     }

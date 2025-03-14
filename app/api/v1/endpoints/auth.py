@@ -6,7 +6,7 @@ from app.models.admin_user import AdminUser
 from app.core.security import verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/token")

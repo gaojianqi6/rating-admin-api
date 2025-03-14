@@ -8,7 +8,7 @@ from app.db.session import get_session
 from fastapi import HTTPException, status
 
 SECRET_KEY = os.getenv("ADMIN_JWT_SECRET", "admin_default_secret_key")
-router = APIRouter()
+router = APIRouter(prefix="/users", tags=["users"])
 
 async def get_current_user(token: str = Depends(oauth2_scheme), session=Depends(get_session)):
     try:
@@ -28,6 +28,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session=Depends(
 
     return user
 
-@router.get("/users/me")
+@router.get("/me")
 async def read_users_me(current_user: AdminUser = Depends(get_current_user)):
     return current_user
