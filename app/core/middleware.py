@@ -9,6 +9,12 @@ from fastapi import Request
 # --------------------------------------------------
 class ResponseWrapperMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Skip wrapping for OpenAPI and documentation endpoints
+        if request.url.path.startswith("/openapi.json") or \
+                request.url.path.startswith("/docs") or \
+                request.url.path.startswith("/redoc"):
+            return await call_next(request)
+
         response = await call_next(request)
         content_type = response.headers.get("content-type")
         # Only process if response is JSON and status code 200
