@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends
 from app.core.security import oauth2_scheme
 from jose import jwt, JWTError
@@ -6,11 +7,12 @@ from sqlmodel import select
 from app.db.session import get_session
 from fastapi import HTTPException, status
 
+SECRET_KEY = os.getenv("ADMIN_JWT_SECRET", "admin_default_secret_key")
 router = APIRouter()
 
 async def get_current_user(token: str = Depends(oauth2_scheme), session=Depends(get_session)):
     try:
-        payload = jwt.decode(token, "your_secret_key", algorithms=["HS256"])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         username: str = payload.get("sub")
         if username is None:
             raise HTTPException(status_code=401, detail="Invalid credentials")
