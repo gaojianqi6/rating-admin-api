@@ -1,0 +1,27 @@
+# Ignore virtual environment
+rating-venv/
+venv/
+.env
+*.env
+
+# Ignore database migration files
+alembic/versions/
+
+# Ignore VS Code settings
+.vscode/
+
+# Ignore PyCharm project files
+.idea/
+*.iml
+
+# Ignore logs and temp files
+*.log
+logs/
+*.bak
+*.swp
+*.swo
+
+# Ignore macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
