@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 
 class AdminRole(SQLModel, table=True):
+    __tablename__ = "admin_role"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(max_length=20, unique=True)
 
