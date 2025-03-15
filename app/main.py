@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Request, HTTPException, status
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
 import logging
 from app.api.v1.api import router as api_v1_router
 from app.api.root import router as root_router
@@ -18,6 +20,18 @@ app = FastAPI(
     redoc_url="/redoc"  # ReDoc available at /redoc
 )
 
+origins = [
+    "http://localhost",
+    "http://localhost:5000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Add the middleware to the app
 app.add_middleware(ResponseWrapperMiddleware)
