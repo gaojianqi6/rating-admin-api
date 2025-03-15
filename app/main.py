@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, status
 import logging
-from app.api.v1.endpoints import auth, users, test
+from app.api.v1.api import router as api_v1_router
 from app.api.root import router as root_router
 from app.core.middleware import ResponseWrapperMiddleware
 from app.core.error_handlers import http_exception_handler, generic_exception_handler
@@ -26,10 +26,7 @@ app.add_middleware(ResponseWrapperMiddleware)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
-#  Include routers (each router have its own prefix and tags)
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(test.router)
+app.include_router(api_v1_router, prefix="/api/v1")
 app.include_router(root_router)
 
 if __name__ == "__main__":
