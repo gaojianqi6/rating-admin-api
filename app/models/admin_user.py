@@ -9,6 +9,7 @@ class AdminUser(SQLModel, table=True):
     __tablename__ = "admin_user"
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(max_length=50, unique=True)
+    email: str = Field(max_length=100, unique=True)
     password: str = Field(max_length=255)
     role_id: int = Field(foreign_key="admin_role.id")
     created_time: datetime = Field(default_factory=datetime.utcnow)
