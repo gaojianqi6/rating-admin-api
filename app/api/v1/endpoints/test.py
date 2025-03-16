@@ -20,6 +20,6 @@ async def test_password():
     # Return the hashed password and verification result.
     # You can store the 'hashed' value in your database for your user record.
     return {
-        "hashed_password": hashed,
+        "hashedPassword": hashed,
         "verification": valid
     }

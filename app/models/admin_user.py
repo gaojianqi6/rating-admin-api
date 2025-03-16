@@ -1,11 +1,12 @@
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import Field, Relationship
 from typing import Optional, TYPE_CHECKING
 from datetime import datetime
+from app.lib.model_base import CamelModel
 
 if TYPE_CHECKING:
     from app.models.admin_role import AdminRole
 
-class AdminUser(SQLModel, table=True):
+class AdminUser(CamelModel, table=True):
     __tablename__ = "admin_user"
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(max_length=50, unique=True)

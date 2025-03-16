@@ -1,7 +1,8 @@
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import Field, Relationship
 from typing import Optional, List
+from app.lib.model_base import CamelModel
 
-class AdminRole(SQLModel, table=True):
+class AdminRole(CamelModel, table=True):
     __tablename__ = "admin_role"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(max_length=20, unique=True)
