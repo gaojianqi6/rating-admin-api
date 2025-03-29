@@ -13,7 +13,7 @@ uvicorn app.main:app --reload
 1. Create `.env` file, Add some credentials to the file
 ```env
 # Databse url
-ADMIN_DATABASE_URL="postgresql+psycopg2://username:password@localhost/rating_admin"
+ADMIN_DATABASE_URL="postgresql+psycopg2://username:password@localhost/rating"
 
 # For JWT Token
 ADMIN_JWT_SECRET=****
