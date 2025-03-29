@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlmodel import select, Session, func
+from sqlmodel import select, Session, func, delete
 from typing import List, Optional, Dict, Any
 from app.db.session import get_session
 from app.models.template import Template
@@ -8,8 +8,10 @@ from app.models.admin_user import AdminUser
 from app.schemas.template import TemplateCreate, TemplateResponse
 from app.api.v1.endpoints.users import get_current_user
 from datetime import datetime
+import logging
 
 router = APIRouter(prefix="/templates", tags=["templates"])
+logger = logging.getLogger(__name__)
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=TemplateResponse)
 async def create_template(
@@ -97,12 +99,16 @@ async def update_template(
         session: Session = Depends(get_session),
         current_user: AdminUser = Depends(get_current_user)
 ):
+    logger.info(f"=== TEMPLATE UPDATE START ===")
+    logger.info(f"Template ID: {template_id}")
+    logger.info(f"Current User: {current_user.username} (ID: {current_user.id})")
+
     # Check if template exists
     db_template = session.get(Template, template_id)
     if not db_template:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    # Update template
+    # Update template fields only if provided
     db_template.name = template.name
     db_template.display_name = template.display_name
     db_template.description = template.description
@@ -110,27 +116,55 @@ async def update_template(
     db_template.updated_by = current_user.id
     db_template.updated_at = datetime.utcnow()
 
-    # Delete existing fields
-    session.exec(
-        select(TemplateField).where(TemplateField.template_id == template_id)
-    ).delete()
+    # Fetch existing fields
+    existing_fields = {
+        field.id: field for field in session.exec(
+            select(TemplateField).where(TemplateField.template_id == template_id)
+        ).all()
+    }
 
-    # Create new fields
-    for field in template.fields:
-        db_field = TemplateField(
-            template_id=db_template.id,
-            name=field.name,
-            display_name=field.display_name,
-            description=field.description,
-            field_type=field.field_type,
-            is_required=field.is_required,
-            is_searchable=field.is_searchable,
-            is_filterable=field.is_filterable,
-            display_order=field.display_order,
-            data_source_id=field.data_source_id,
-            validation_rules=field.validation_rules
-        )
-        session.add(db_field)
+    # Process incoming fields
+    incoming_field_ids = set()
+    for field_data in template.fields:
+        if field_data.id is not None:
+            # Update existing field
+            if field_data.id in existing_fields:
+                db_field = existing_fields[field_data.id]
+                db_field.name = field_data.name
+                db_field.display_name = field_data.display_name
+                db_field.description = field_data.description
+                db_field.field_type = field_data.field_type
+                db_field.is_required = field_data.is_required
+                db_field.is_searchable = field_data.is_searchable
+                db_field.is_filterable = field_data.is_filterable
+                db_field.display_order = field_data.display_order
+                db_field.data_source_id = field_data.data_source_id
+                db_field.validation_rules = field_data.validation_rules
+                session.add(db_field)
+                incoming_field_ids.add(field_data.id)
+            else:
+                raise HTTPException(status_code=400, detail=f"Field with id {field_data.id} does not exist")
+        else:
+            # Create new field
+            db_field = TemplateField(
+                template_id=db_template.id,
+                name=field_data.name,
+                display_name=field_data.display_name,
+                description=field_data.description,
+                field_type=field_data.field_type,
+                is_required=field_data.is_required,
+                is_searchable=field_data.is_searchable,
+                is_filterable=field_data.is_filterable,
+                display_order=field_data.display_order,
+                data_source_id=field_data.data_source_id,
+                validation_rules=field_data.validation_rules
+            )
+            session.add(db_field)
+
+    # Delete fields not in the payload
+    for field_id in existing_fields:
+        if field_id not in incoming_field_ids:
+            session.delete(existing_fields[field_id])
 
     session.commit()
     session.refresh(db_template)
@@ -388,12 +422,14 @@ async def delete_template(
 
     # Delete associated fields first (cascade delete might be set up, but being explicit)
     session.exec(
-        select(TemplateField).where(TemplateField.template_id == template_id)
-    ).delete()
+        delete(TemplateField).where(TemplateField.template_id == template_id)
+    )
 
     # Delete the template
     session.delete(template)
     session.commit()
+
+    logger.info(f"Deleting template ID: {template_id} by user: {current_user.id}, {current_user.username}")
 
     return {"status": "success", "message": "Template deleted successfully"}
 
@@ -450,6 +486,8 @@ async def clone_template(
     # Load creator name
     creator = session.get(AdminUser, current_user.id)
     creator_name = creator.username if creator else None
+
+    logger.info(f"Clone template: {new_template.id}, {new_template.name} by user: {current_user.id}, {current_user.username}")
 
     return {
         "status": "success",

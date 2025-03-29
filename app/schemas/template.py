@@ -1,7 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
+from app.lib.model_base import APIBaseModel
 
-class TemplateFieldCreate(BaseModel):
+class TemplateFieldCreate(APIBaseModel):
+    id: Optional[int] = None
     name: str
     display_name: str
     description: Optional[str] = None
@@ -13,7 +15,7 @@ class TemplateFieldCreate(BaseModel):
     data_source_id: Optional[int] = None
     validation_rules: Optional[Dict[str, Any]] = None
 
-class TemplateCreate(BaseModel):
+class TemplateCreate(APIBaseModel):
     name: str
     display_name: str
     description: str

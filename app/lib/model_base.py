@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel
+from pydantic import BaseModel, ConfigDict
 
 
 def to_camel(string: str) -> str:
@@ -17,3 +18,12 @@ class CamelModel(SQLModel):
     #     "alias_generator": to_camel,
     #     "populate_by_name": True,
     # }
+
+class APIBaseModel(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=lambda field_name: ''.join(
+            word.capitalize() if i > 0 else word
+            for i, word in enumerate(field_name.split('_'))
+        ),
+        populate_by_name=True
+    )
