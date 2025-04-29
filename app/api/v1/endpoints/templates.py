@@ -126,7 +126,7 @@ async def update_template(
     # Process incoming fields
     incoming_field_ids = set()
     for field_data in template.fields:
-        if field_data.id is not None:
+        if field_data.id is not None and field_data.id != -1:
             # Update existing field
             if field_data.id in existing_fields:
                 db_field = existing_fields[field_data.id]
@@ -145,6 +145,11 @@ async def update_template(
             else:
                 raise HTTPException(status_code=400, detail=f"Field with id {field_data.id} does not exist")
         else:
+            # Check for duplicate field name
+            existing_field_names = {field.name for field in existing_fields.values()}
+            if field_data.name in existing_field_names:
+                raise HTTPException(status_code=400,
+                                    detail=f"Field with name {field_data.name} already exists for this template")
             # Create new field
             db_field = TemplateField(
                 template_id=db_template.id,

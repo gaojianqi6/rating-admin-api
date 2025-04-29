@@ -7,7 +7,7 @@ from typing import Optional
 
 SECRET_KEY = os.getenv("ADMIN_JWT_SECRET", "admin_default_secret_key")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 8
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 

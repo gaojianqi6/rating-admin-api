@@ -184,7 +184,7 @@ async def get_item_details(
     for field_value, template_field in field_values_result:
         # Determine the value based on field type
         value = None
-        if template_field.field_type == "text":
+        if template_field.field_type == "text" or template_field.field_type == "textarea"  or template_field.field_type == "select":
             value = field_value.text_value
         elif template_field.field_type == "number":
             value = field_value.numeric_value
