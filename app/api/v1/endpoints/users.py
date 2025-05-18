@@ -8,26 +8,11 @@ from sqlalchemy.orm import joinedload
 from app.db.session import get_session
 from app.models.admin_user import AdminUser
 from app.models.admin_role import AdminRole
+from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, EmailStr
 
 SECRET_KEY = os.getenv("ADMIN_JWT_SECRET", "admin_default_secret_key")
 router = APIRouter(prefix="/users", tags=["users"])
-
-# Schemas for user operations
-class UserCreate(BaseModel):
-    username: str
-    email: EmailStr
-    password: str
-    role_id: int
-
-class UserUpdate(BaseModel):
-    username: Optional[str] = None
-    email: Optional[EmailStr] = None
-    password: Optional[str] = None
-    role_id: Optional[int] = None
-
 
 async def get_current_user(token: str = Depends(oauth2_scheme), session=Depends(get_session)):
     try:
@@ -57,29 +42,31 @@ async def check_is_administrator(current_user: AdminUser = Depends(get_current_u
         )
     return current_user
 
-
-@router.get("/me", summary="Get current user with roleName and updatedByName")
+@router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: AdminUser = Depends(get_current_user), session=Depends(get_session)):
     # Load updater if available (using updated_by field)
     updater = None
     if current_user.updated_by:
         updater = session.get(AdminUser, current_user.updated_by)
 
-    # Convert the user model to a dictionary with alias (camelCase) fields
-    user_data = current_user.dict(by_alias=True)
-    user_data["roleName"] = current_user.role.name if current_user.role else None
-    user_data["updatedByName"] = updater.username if updater else None
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "roleId": current_user.role_id,
+        "roleName": current_user.role.name if current_user.role else None,
+        "createdTime": current_user.created_time,
+        "updatedTime": current_user.updated_time,
+        "updatedBy": current_user.updated_by,
+        "updatedByName": updater.username if updater else None
+    }
 
-    return user_data
-
-
-@router.get("/roles", summary="Get all roles")
+@router.get("/roles")
 async def get_all_roles(session=Depends(get_session)):
     query = select(AdminRole)
     result = session.execute(query)
     roles = result.scalars().all()
     return roles
-
 
 @router.get("/", summary="Get users by pagination")
 async def get_users_paginated(pageNo: int = 1, pageSize: int = 10, session=Depends(get_session)):
@@ -106,10 +93,17 @@ async def get_users_paginated(pageNo: int = 1, pageSize: int = 10, session=Depen
     # Enrich each user with roleName and updatedByName
     enriched_users = []
     for user in users_list:
-        user_data = user.dict(by_alias=True)
-        user_data["roleName"] = user.role.name if user.role else None
-        user_data["updatedByName"] = updater_mapping.get(user.updated_by, None)
-        enriched_users.append(user_data)
+        enriched_users.append({
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "roleId": user.role_id,
+            "roleName": user.role.name if user.role else None,
+            "createdTime": user.created_time,
+            "updatedTime": user.updated_time,
+            "updatedBy": user.updated_by,
+            "updatedByName": updater_mapping.get(user.updated_by, None)
+        })
 
     return {
         "list": enriched_users,
@@ -118,7 +112,7 @@ async def get_users_paginated(pageNo: int = 1, pageSize: int = 10, session=Depen
         "total": total
     }
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
     session=Depends(get_session),
@@ -146,7 +140,7 @@ async def create_user(
         )
 
     # Check if role exists
-    role = session.get(AdminRole, user_data.role_id)
+    role = session.get(AdminRole, user_data.roleId)
     if not role:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -158,7 +152,7 @@ async def create_user(
         username=user_data.username,
         email=user_data.email,
         password=hash_password(user_data.password),
-        role_id=user_data.role_id,
+        role_id=user_data.roleId,
         updated_by=current_user.id
     )
     
@@ -170,13 +164,15 @@ async def create_user(
         "id": db_user.id,
         "username": db_user.username,
         "email": db_user.email,
-        "role_id": db_user.role_id,
-        "created_time": db_user.created_time,
-        "updated_time": db_user.updated_time,
-        "updated_by": db_user.updated_by
+        "roleId": db_user.role_id,
+        "roleName": role.name,
+        "createdTime": db_user.created_time,
+        "updatedTime": db_user.updated_time,
+        "updatedBy": db_user.updated_by,
+        "updatedByName": current_user.username
     }
 
-@router.put("/{user_id}")
+@router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
     user_id: int,
     user_data: UserUpdate,
@@ -221,14 +217,15 @@ async def update_user(
         db_user.password = hash_password(user_data.password)
 
     # Update role if provided
-    if user_data.role_id:
-        role = session.get(AdminRole, user_data.role_id)
+    role = None
+    if user_data.roleId:
+        role = session.get(AdminRole, user_data.roleId)
         if not role:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Role not found"
             )
-        db_user.role_id = user_data.role_id
+        db_user.role_id = user_data.roleId
 
     # Update metadata
     db_user.updated_time = datetime.utcnow()
@@ -238,14 +235,20 @@ async def update_user(
     session.commit()
     session.refresh(db_user)
 
+    # Get role name if not loaded
+    if not role and db_user.role_id:
+        role = session.get(AdminRole, db_user.role_id)
+
     return {
         "id": db_user.id,
         "username": db_user.username,
         "email": db_user.email,
-        "role_id": db_user.role_id,
-        "created_time": db_user.created_time,
-        "updated_time": db_user.updated_time,
-        "updated_by": db_user.updated_by
+        "roleId": db_user.role_id,
+        "roleName": role.name if role else None,
+        "createdTime": db_user.created_time,
+        "updatedTime": db_user.updated_time,
+        "updatedBy": db_user.updated_by,
+        "updatedByName": current_user.username
     }
 
 @router.delete("/{user_id}")
