@@ -1,6 +1,6 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException
-from app.core.security import oauth2_scheme
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.security import oauth2_scheme, hash_password
 from jose import jwt, JWTError
 from sqlmodel import select
 from sqlalchemy import func
@@ -8,9 +8,25 @@ from sqlalchemy.orm import joinedload
 from app.db.session import get_session
 from app.models.admin_user import AdminUser
 from app.models.admin_role import AdminRole
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, EmailStr
 
 SECRET_KEY = os.getenv("ADMIN_JWT_SECRET", "admin_default_secret_key")
 router = APIRouter(prefix="/users", tags=["users"])
+
+# Schemas for user operations
+class UserCreate(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    role_id: int
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    role_id: Optional[int] = None
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme), session=Depends(get_session)):
@@ -31,6 +47,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme), session=Depends(
         raise HTTPException(status_code=401, detail="User not found")
 
     return user
+
+async def check_is_administrator(current_user: AdminUser = Depends(get_current_user)):
+    """Check if the current user has Administrator role"""
+    if not current_user.role or current_user.role.name != "Administrator":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can perform this action"
+        )
+    return current_user
 
 
 @router.get("/me", summary="Get current user with roleName and updatedByName")
@@ -92,3 +117,161 @@ async def get_users_paginated(pageNo: int = 1, pageSize: int = 10, session=Depen
         "pageSize": pageSize,
         "total": total
     }
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+async def create_user(
+    user_data: UserCreate,
+    session=Depends(get_session),
+    current_user: AdminUser = Depends(check_is_administrator)
+):
+    """Create a new admin user"""
+    # Check if username already exists
+    existing_user = session.exec(
+        select(AdminUser).where(AdminUser.username == user_data.username)
+    ).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+
+    # Check if email already exists
+    existing_email = session.exec(
+        select(AdminUser).where(AdminUser.email == user_data.email)
+    ).first()
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    # Check if role exists
+    role = session.get(AdminRole, user_data.role_id)
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Role not found"
+        )
+
+    # Create new user
+    db_user = AdminUser(
+        username=user_data.username,
+        email=user_data.email,
+        password=hash_password(user_data.password),
+        role_id=user_data.role_id,
+        updated_by=current_user.id
+    )
+    
+    session.add(db_user)
+    session.commit()
+    session.refresh(db_user)
+
+    return {
+        "id": db_user.id,
+        "username": db_user.username,
+        "email": db_user.email,
+        "role_id": db_user.role_id,
+        "created_time": db_user.created_time,
+        "updated_time": db_user.updated_time,
+        "updated_by": db_user.updated_by
+    }
+
+@router.put("/{user_id}")
+async def update_user(
+    user_id: int,
+    user_data: UserUpdate,
+    session=Depends(get_session),
+    current_user: AdminUser = Depends(check_is_administrator)
+):
+    """Update an existing admin user"""
+    # Get the user to update
+    db_user = session.get(AdminUser, user_id)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Check username uniqueness if being updated
+    if user_data.username and user_data.username != db_user.username:
+        existing_user = session.exec(
+            select(AdminUser).where(AdminUser.username == user_data.username)
+        ).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already taken"
+            )
+        db_user.username = user_data.username
+
+    # Check email uniqueness if being updated
+    if user_data.email and user_data.email != db_user.email:
+        existing_email = session.exec(
+            select(AdminUser).where(AdminUser.email == user_data.email)
+        ).first()
+        if existing_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        db_user.email = user_data.email
+
+    # Update password if provided
+    if user_data.password:
+        db_user.password = hash_password(user_data.password)
+
+    # Update role if provided
+    if user_data.role_id:
+        role = session.get(AdminRole, user_data.role_id)
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Role not found"
+            )
+        db_user.role_id = user_data.role_id
+
+    # Update metadata
+    db_user.updated_time = datetime.utcnow()
+    db_user.updated_by = current_user.id
+
+    session.add(db_user)
+    session.commit()
+    session.refresh(db_user)
+
+    return {
+        "id": db_user.id,
+        "username": db_user.username,
+        "email": db_user.email,
+        "role_id": db_user.role_id,
+        "created_time": db_user.created_time,
+        "updated_time": db_user.updated_time,
+        "updated_by": db_user.updated_by
+    }
+
+@router.delete("/{user_id}")
+async def delete_user(
+    user_id: int,
+    session=Depends(get_session),
+    current_user: AdminUser = Depends(check_is_administrator)
+):
+    """Delete an admin user"""
+    # Protect user ID 1 from deletion
+    if user_id == 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete the primary administrator account"
+        )
+
+    # Get the user to delete
+    db_user = session.get(AdminUser, user_id)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Delete the user
+    session.delete(db_user)
+    session.commit()
+
+    return {"status": "success", "message": "User deleted successfully"}
