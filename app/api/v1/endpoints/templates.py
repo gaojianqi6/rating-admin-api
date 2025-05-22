@@ -13,6 +13,7 @@ import logging
 router = APIRouter(prefix="/templates", tags=["templates"])
 logger = logging.getLogger(__name__)
 
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=TemplateResponse)
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=TemplateResponse)
 async def create_template(
         template: TemplateCreate,
@@ -214,6 +215,7 @@ async def update_template(
         ]
     }
 
+@router.get("")
 @router.get("/")
 async def get_templates(
         page_no: int = Query(1, alias="pageNo"),

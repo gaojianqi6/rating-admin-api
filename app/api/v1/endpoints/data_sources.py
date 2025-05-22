@@ -10,7 +10,7 @@ from app.models.admin_user import AdminUser
 
 router = APIRouter(prefix="/data-sources", tags=["data-sources"])
 
-
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=DataSourceResponse)
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=DataSourceResponse)
 async def create_data_source(
         data_source: DataSourceCreate,
@@ -53,6 +53,7 @@ async def create_data_source(
     }
 
 
+@router.get("", response_model=List[DataSourceResponse])
 @router.get("/", response_model=List[DataSourceResponse])
 async def get_data_sources(session: Session = Depends(get_session)):
     data_sources = session.exec(select(FieldDataSource)).all()

@@ -19,7 +19,7 @@ import logging
 router = APIRouter(prefix="/items", tags=["items"])
 logger = logging.getLogger(__name__)
 
-
+@router.get("", response_model=ItemListResponse)
 @router.get("/", response_model=ItemListResponse)
 async def get_items(
         pageNo: int = Query(1),

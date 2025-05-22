@@ -68,6 +68,7 @@ async def get_all_roles(session=Depends(get_session)):
     roles = result.scalars().all()
     return roles
 
+@router.get("", summary="Get users by pagination")
 @router.get("/", summary="Get users by pagination")
 async def get_users_paginated(pageNo: int = 1, pageSize: int = 10, session=Depends(get_session)):
     offset = (pageNo - 1) * pageSize
@@ -112,6 +113,7 @@ async def get_users_paginated(pageNo: int = 1, pageSize: int = 10, session=Depen
         "total": total
     }
 
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
