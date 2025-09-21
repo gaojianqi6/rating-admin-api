@@ -48,7 +48,7 @@ pip install -r requirements.txt
 Create a `.env` file in the root directory with the following content:
 ```env
 # Database Configuration
-ADMIN_DATABASE_URL="postgresql+psycopg2://username:password@localhost/rating"
+ADMIN_DATABASE_URL="postgresql+psycopg://username:password@localhost/rating"
 
 # JWT Configuration
 ADMIN_JWT_SECRET="your-secret-key-here"
